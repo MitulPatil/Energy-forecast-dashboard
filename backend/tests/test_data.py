@@ -9,6 +9,33 @@ from app.services.data import normalize_actuals, normalize_forecasts
 
 
 class DataNormalizationTests(unittest.TestCase):
+    def test_actuals_are_fetched_in_seven_day_chunks(self) -> None:
+        class FakeClient:
+            def __init__(self) -> None:
+                self.ranges = []
+
+            async def fetch_actuals(self, start_date, end_date):
+                self.ranges.append((start_date, end_date))
+                return []
+
+        async def run() -> None:
+            from app.services.data import get_actuals
+
+            client = FakeClient()
+            await get_actuals(client, date(2026, 1, 1), date(2026, 1, 20))
+            self.assertEqual(
+                sorted(client.ranges),
+                [
+                    (date(2026, 1, 1), date(2026, 1, 7)),
+                    (date(2026, 1, 8), date(2026, 1, 14)),
+                    (date(2026, 1, 15), date(2026, 1, 20)),
+                ],
+            )
+
+        import asyncio
+
+        asyncio.run(run())
+
     def test_normalize_actuals_keeps_wind_rows_and_normalizes_timestamps(self) -> None:
         rows = [
             {

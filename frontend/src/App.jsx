@@ -97,9 +97,13 @@ function App() {
     event?.preventDefault()
     setStatus('loading')
     setError('')
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 90000)
     try {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate, cutoff_hour: cutoffHour })
-      const response = await fetch(`${API_BASE_URL}/api/analytics/summary?${params}`)
+      const response = await fetch(`${API_BASE_URL}/api/analytics/summary?${params}`, {
+        signal: controller.signal,
+      })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
         throw new Error(body.detail || `The analytics API returned ${response.status}.`)
@@ -109,7 +113,11 @@ function App() {
       setStatus(result.intervals?.length ? 'ready' : 'empty')
     } catch (requestError) {
       setStatus('error')
-      setError(requestError.message || 'Unable to load analytics.')
+      setError(requestError.name === 'AbortError'
+        ? 'The analytics request took longer than 90 seconds. The backend may be waking up or the selected range may be too large.'
+        : requestError.message || 'Unable to load analytics.')
+    } finally {
+      clearTimeout(timeout)
     }
   }, [cutoffHour, endDate, startDate])
 
